@@ -12,7 +12,7 @@ pip install h5py opencv-python numpy tqdm
 python hdf5_to_video.py 17.hdf5 output_folder/ --layout camera_grouped
 ```
 ![Demo](demo.gif)
-
+![Screenshot](data_format.png)
 ## Usage
 
 ### Basic Commands
