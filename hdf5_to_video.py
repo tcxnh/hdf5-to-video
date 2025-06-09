@@ -305,9 +305,57 @@ def list_hdf5_contents(hdf5_path):
         print("-" * 50)
         f.visititems(print_structure)
 
+def batch_process_hdf5_files(input_dir, output_base_dir, dataset_names=None, fps=30, codec='mp4v', layout='separate', camera_info_count=3):
+    """
+    Batch process all HDF5 files in a directory
+    
+    Args:
+    input_dir: Directory containing HDF5 files
+    output_base_dir: Base directory for output videos
+    dataset_names: List of dataset names for each camera (auto-detect if None)
+    fps: Video frame rate
+    codec: Video codec
+    layout: Video layout type
+    camera_info_count: Number of info streams per camera
+    """
+    # Create output base directory if it doesn't exist
+    os.makedirs(output_base_dir, exist_ok=True)
+    
+    # Get all HDF5 files in the input directory
+    hdf5_files = [f for f in os.listdir(input_dir) if f.endswith('.h5') or f.endswith('.hdf5')]
+    
+    if not hdf5_files:
+        print(f"No HDF5 files found in {input_dir}")
+        return
+    
+    print(f"Found {len(hdf5_files)} HDF5 files to process")
+    
+    # Process each HDF5 file
+    for hdf5_file in tqdm(hdf5_files, desc="Processing HDF5 files"):
+        input_path = os.path.join(input_dir, hdf5_file)
+        
+        # Create output directory based on input filename (without extension)
+        file_name = os.path.splitext(hdf5_file)[0]
+        output_dir = os.path.join(output_base_dir, file_name)
+        
+        try:
+            print(f"\nProcessing {hdf5_file}...")
+            hdf5_to_video_multi_camera(
+                hdf5_path=input_path,
+                output_dir=output_dir,
+                dataset_names=dataset_names,
+                fps=fps,
+                codec=codec,
+                layout=layout,
+                camera_info_count=camera_info_count
+            )
+            print(f"Successfully processed {hdf5_file}")
+        except Exception as e:
+            print(f"Error processing {hdf5_file}: {str(e)}")
+
 def main():
     parser = argparse.ArgumentParser(description='Convert HDF5 multi-camera data to video')
-    parser.add_argument('input', help='Input HDF5 file path')
+    parser.add_argument('input', help='Input HDF5 file path or directory')
     parser.add_argument('output', help='Output directory for video files')
     parser.add_argument('--datasets', '-d', nargs='+', help='Dataset names for cameras (e.g., camera1 camera2)')
     parser.add_argument('--fps', type=int, default=30, help='Video frame rate (default: 30)')
@@ -317,27 +365,48 @@ def main():
     parser.add_argument('--camera-info-count', type=int, default=3, 
                        help='Number of info streams per camera for camera_grouped layout (default: 3)')
     parser.add_argument('--list', '-l', action='store_true', help='List HDF5 file contents')
+    parser.add_argument('--batch', '-b', action='store_true', help='Process all HDF5 files in input directory')
     
     args = parser.parse_args()
     
     if not os.path.exists(args.input):
-        print(f"Error: Input file does not exist: {args.input}")
+        print(f"Error: Input path does not exist: {args.input}")
         return
     
     if args.list:
+        if os.path.isdir(args.input):
+            print("Error: --list option only works with individual HDF5 files, not directories")
+            return
         list_hdf5_contents(args.input)
         return
     
     try:
-        hdf5_to_video_multi_camera(
-            hdf5_path=args.input,
-            output_dir=args.output,
-            dataset_names=args.datasets,
-            fps=args.fps,
-            codec=args.codec,
-            layout=args.layout,
-            camera_info_count=args.camera_info_count
-        )
+        if args.batch:
+            if not os.path.isdir(args.input):
+                print("Error: --batch option requires a directory as input")
+                return
+            batch_process_hdf5_files(
+                input_dir=args.input,
+                output_base_dir=args.output,
+                dataset_names=args.datasets,
+                fps=args.fps,
+                codec=args.codec,
+                layout=args.layout,
+                camera_info_count=args.camera_info_count
+            )
+        else:
+            if os.path.isdir(args.input):
+                print("Error: Input must be a file when not using --batch option")
+                return
+            hdf5_to_video_multi_camera(
+                hdf5_path=args.input,
+                output_dir=args.output,
+                dataset_names=args.datasets,
+                fps=args.fps,
+                codec=args.codec,
+                layout=args.layout,
+                camera_info_count=args.camera_info_count
+            )
     except Exception as e:
         print(f"Conversion failed: {str(e)}")
 
